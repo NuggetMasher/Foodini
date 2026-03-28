@@ -78,12 +78,11 @@ export default function App() {
             <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-200">
               <ChefHat size={24} />
             </div>
-            <h1 className="text-xl font-semibold tracking-tight">ChefGenie</h1>
+            <h1 className="text-xl font-semibold tracking-tight">Foodini</h1>
           </div>
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-500">
             <a href="#" className="text-orange-600">Generator</a>
             <a href="#" className="hover:text-gray-900 transition-colors">Saved Recipes</a>
-            <a href="#" className="hover:text-gray-900 transition-colors">Community</a>
           </nav>
         </div>
       </header>
