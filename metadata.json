@@ -1,0 +1,5 @@
+{
+  "name": "Foodini: AI Chef Assistant",
+  "description": "Generate personalized meal ideas and recipes based on your available ingredients and dietary restrictions using Gemini AI.",
+  "requestFramePermissions": []
+}
