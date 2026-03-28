@@ -87,10 +87,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        <div className="grid lg:grid-cols-[1fr_1.5fr] gap-12">
+      <main className="max-w-5xl mx-auto px-6 overflow-hidden">
+        <div className="grid lg:grid-cols-[1fr_1.5fr] gap-12 lg:h-[calc(100vh-80px)] py-8">
           {/* Controls */}
-          <section className="space-y-10">
+          <section className="space-y-10 lg:overflow-y-auto lg:pr-6 custom-scrollbar">
             <div>
               <h2 className="text-3xl font-light tracking-tight mb-2 italic serif">What's in your kitchen?</h2>
               <p className="text-gray-500 text-sm">Add the ingredients you have on hand.</p>
@@ -201,7 +201,7 @@ export default function App() {
           </section>
 
           {/* Results */}
-          <section className="space-y-8">
+          <section className="space-y-8 lg:overflow-y-auto lg:pr-6 custom-scrollbar">
             <AnimatePresence mode="wait">
               {recipes.length > 0 ? (
                 <motion.div
@@ -314,16 +314,6 @@ export default function App() {
         </div>
       </main>
 
-      <footer className="border-t border-gray-100 py-12 mt-20">
-        <div className="max-w-5xl mx-auto px-6 text-center space-y-4">
-          <p className="text-sm text-gray-400">Powered by Gemini AI • Crafted for Home Chefs</p>
-          <div className="flex justify-center gap-6 text-xs font-bold uppercase tracking-widest text-gray-300">
-            <a href="#" className="hover:text-gray-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-gray-600 transition-colors">Terms</a>
-            <a href="#" className="hover:text-gray-600 transition-colors">Support</a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
