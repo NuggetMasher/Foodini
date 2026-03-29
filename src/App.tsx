@@ -38,7 +38,6 @@ export default function App() {
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [cuisine, setCuisine] = useState("");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -46,17 +45,15 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>(() => {
+  try {
     const stored = localStorage.getItem("foodini_saved_recipes");
-
-    if (stored) {
-      try {
-        setSavedRecipes(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to parse saved recipes", e);
-      }
-    }
-  }, []);
+    return stored ? JSON.parse(stored) : [];
+  } catch (e) {
+    console.error("Failed to parse saved recipes", e);
+    return [];
+  }
+});
 
   useEffect(() => {
     localStorage.setItem("foodini_saved_recipes", JSON.stringify(savedRecipes));
