@@ -21,7 +21,8 @@ import { generateRecipes } from "./services/gemini";
 
 const DIETARY_OPTIONS = [
   "Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free", 
-  "Keto", "Paleo", "Low-Carb", "Nut-Free"
+  "Keto", "High-Protein", "Low-Carb", "Nut-Free",
+  "Low-Calorie"
 ];
 
 export default function App() {
