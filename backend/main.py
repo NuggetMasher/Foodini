@@ -42,7 +42,11 @@ def signup(user: schemas.UserAuth, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=400, detail="Username taken")
         
     # FIX: Add [:72] to the password here
-    hashed = pwd_context.hash(user.password[:72]) 
+    password_bytes = user.password.encode("utf-8")
+    if len(password_bytes) > 72:
+        raise HTTPException(status_code=400, detail="Password must be 72 bytes or fewer.")
+
+    hashed = pwd_context.hash(user.password)
     
     new_user = models.User(username=user.username, hashed_password=hashed)
     db.add(new_user)
