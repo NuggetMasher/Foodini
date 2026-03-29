@@ -23,6 +23,7 @@ import {
 import { Recipe } from "./types";
 import { extractIngredientsFromImage, generateRecipeImage } from "./services/gemini";
 import { compressImage } from "./utils/image";
+import { API_BASE_URL } from "./config";
 
 const DIETARY_OPTIONS = [
   "Vegetarian",
@@ -73,7 +74,7 @@ export default function App() {
           const token = localStorage.getItem("myToken");
           if (!token) return;
 
-          const res = await fetch("http://127.0.0.1:8000/get-preferences", {
+          const res = await fetch(`${API_BASE_URL}/get-preferences`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -102,7 +103,7 @@ export default function App() {
           const token = localStorage.getItem("myToken");
           if (!token) return;
 
-          const res = await fetch("http://127.0.0.1:8000/saved-recipes", {
+          const res = await fetch(`${API_BASE_URL}/saved-recipes`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -130,7 +131,7 @@ export default function App() {
         const token = localStorage.getItem("myToken");
         if (!token) return;
 
-        await fetch("http://127.0.0.1:8000/set-preferences", {
+        await fetch(`${API_BASE_URL}/set-preferences`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -186,7 +187,7 @@ export default function App() {
         if (!savedRecipe || !("id" in savedRecipe)) return;
 
         const id = (savedRecipe as any).id;
-        const res = await fetch(`http://127.0.0.1:8000/saved-recipes/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/saved-recipes/${id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -209,7 +210,7 @@ export default function App() {
           }
         }
 
-        const res = await fetch("http://127.0.0.1:8000/save-recipe", {
+        const res = await fetch(`${API_BASE_URL}/save-recipe`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -369,7 +370,7 @@ export default function App() {
 
     try {
       if (isSignup) {
-        const res = await fetch("http://127.0.0.1:8000/signup", {
+const res = await fetch(`${API_BASE_URL}/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, password }),
@@ -387,7 +388,7 @@ export default function App() {
         body.append("username", username);
         body.append("password", password);
 
-        const res = await fetch("http://127.0.0.1:8000/token", {
+        const res = await fetch(`${API_BASE_URL}/token`, {
           method: "POST",
           body,
         });
@@ -420,7 +421,7 @@ export default function App() {
     const token = localStorage.getItem("myToken");
 
     try {
-      await fetch("http://127.0.0.1:8000/set-preferences", {
+      await fetch(`${API_BASE_URL}/set-preferences`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -433,7 +434,7 @@ export default function App() {
         }),
       });
 
-      const res = await fetch("http://127.0.0.1:8000/generate-meals", {
+      const res = await fetch(`${API_BASE_URL}/generate-meals`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

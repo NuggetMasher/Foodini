@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session # Correct Import
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import models, schemas, database, services, json
+import os
 
 # Security Setup
 SECRET_KEY = "CHEF_SECRET_KEY_123"
@@ -173,3 +175,8 @@ def delete_saved_recipe(
     db.delete(recipe)
     db.commit()
     return {"message": "Recipe deleted successfully"}
+
+# Mount static files (frontend) - Must be last!
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
