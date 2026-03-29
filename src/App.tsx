@@ -21,7 +21,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Recipe } from "./types";
-import { extractIngredientsFromImage } from "./services/gemini";
+import { extractIngredientsFromImage, generateRecipeImage } from "./services/gemini";
 import { compressImage } from "./utils/image";
 
 const DIETARY_OPTIONS = [
@@ -445,7 +445,24 @@ export default function App() {
       }
 
       const data: Recipe[] = await res.json();
-      setRecipes(data);
+      
+      // Generate images for recipes in parallel
+      const recipesWithImages: Recipe[] = [];
+      for (const recipe of data) {
+        // Generate image asynchronously but add recipe immediately
+        const imagePromise = generateRecipeImage(recipe.title, recipe.description)
+          .catch((e) => {
+            console.error(`Failed to generate image for ${recipe.title}:`, e);
+            return undefined;
+          });
+        
+        recipesWithImages.push({
+          ...recipe,
+          imageUrl: await imagePromise,
+        });
+      }
+      
+      setRecipes(recipesWithImages);
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message : "Failed to get recipes.";

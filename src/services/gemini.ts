@@ -27,6 +27,8 @@ async function generateRecipeImage(title: string, description: string): Promise<
   return undefined;
 }
 
+export { generateRecipeImage };
+
 export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]> {
   const prompt = `Generate up to 6 unique creative and delicious meal ideas based on these inputs:
     Available Ingredients: ${prefs.ingredients.join(", ")}
