@@ -294,6 +294,18 @@ export default function App() {
                             </button>
                           </div>
                           <h4 className="text-2xl font-medium mb-3 group-hover:text-orange-500 transition-colors">{recipe.title}</h4>
+                          
+                          {recipe.imageUrl && (
+                            <div className="mb-6 overflow-hidden rounded-2xl aspect-video bg-gray-100 border border-gray-100">
+                              <img 
+                                src={recipe.imageUrl} 
+                                alt={recipe.title} 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          )}
+
                           <p className="text-gray-600 text-sm leading-relaxed mb-6">{recipe.description}</p>
                           
                           <div className="grid grid-cols-3 gap-4 mb-8">
@@ -410,6 +422,18 @@ export default function App() {
                             </button>
                           </div>
                           <h4 className="text-2xl font-medium mb-3 group-hover:text-orange-500 transition-colors">{recipe.title}</h4>
+
+                          {recipe.imageUrl && (
+                            <div className="mb-6 overflow-hidden rounded-2xl aspect-video bg-gray-100 border border-gray-100">
+                              <img 
+                                src={recipe.imageUrl} 
+                                alt={recipe.title} 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          )}
+
                           <p className="text-gray-600 text-sm leading-relaxed mb-6">{recipe.description}</p>
                           
                           <div className="grid grid-cols-3 gap-4 mb-8">

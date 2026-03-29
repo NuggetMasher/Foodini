@@ -3,14 +3,37 @@ import { Recipe, UserPreferences } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+async function generateRecipeImage(title: string, description: string): Promise<string | undefined> {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            text: `A professional, high-quality food photography shot of a dish called "${title}". ${description}. The lighting is warm and natural, plated beautifully on a clean background.`,
+          },
+        ],
+      },
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to generate image for ${title}:`, e);
+  }
+  return undefined;
+}
+
 export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]> {
-  const prompt = `Generate up to 10 unique creative and delicious meal ideas based on these inputs:
+  const prompt = `Generate up to 6 unique creative and delicious meal ideas based on these inputs:
     Available Ingredients: ${prefs.ingredients.join(", ")}
     Dietary Restrictions: ${prefs.dietaryRestrictions.join(", ")}
     Cuisine Preference: ${prefs.cuisinePreference || "Any"}
 
-    Provide detailed recipes including prep time, cook time, and clear instructions.
-    Be sure to `;
+    Provide detailed recipes including prep time, cook time, and clear instructions.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -47,7 +70,17 @@ export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]>
   });
 
   try {
-    return JSON.parse(response.text);
+    const recipes: Recipe[] = JSON.parse(response.text);
+    
+    // Generate images for each recipe in parallel
+    const recipesWithImages = await Promise.all(
+      recipes.map(async (recipe) => {
+        const imageUrl = await generateRecipeImage(recipe.title, recipe.description);
+        return { ...recipe, imageUrl };
+      })
+    );
+
+    return recipesWithImages;
   } catch (e) {
     console.error("Failed to parse recipes:", e);
     return [];

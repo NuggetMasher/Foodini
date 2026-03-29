@@ -7,6 +7,7 @@ export interface Recipe {
   cookTime: string;
   servings: number;
   dietaryTags: string[];
+  imageUrl?: string;
 }
 
 export interface UserPreferences {
