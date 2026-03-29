@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent, useRef } from "react";
+import { useState, useEffect, ChangeEvent, useRef, FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ChefHat,
@@ -16,9 +16,12 @@ import {
   Camera,
   Plus,
   X,
+  Lock,
+  User as UserIcon,
+  ArrowRight,
 } from "lucide-react";
-import { Recipe, UserPreferences } from "./types";
-import { generateRecipes, extractIngredientsFromImage } from "./services/gemini";
+import { Recipe } from "./types";
+import { extractIngredientsFromImage } from "./services/gemini";
 import { compressImage } from "./utils/image";
 
 const DIETARY_OPTIONS = [
@@ -33,6 +36,13 @@ const DIETARY_OPTIONS = [
 ];
 
 export default function App() {
+  // Auth state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  // App state
   const [activeTab, setActiveTab] = useState<"generator" | "saved">("generator");
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [currentIngredient, setCurrentIngredient] = useState("");
@@ -47,20 +57,27 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [savedRecipes, setSavedRecipes] = useState<Recipe[]>(() => {
-  try {
-    const stored = localStorage.getItem("foodini_saved_recipes");
-    return stored ? JSON.parse(stored) : [];
-  } catch (e) {
-    console.error("Failed to parse saved recipes", e);
-    return [];
-  }
-});
+    try {
+      const stored = localStorage.getItem("foodini_saved_recipes");
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error("Failed to parse saved recipes", e);
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const token = localStorage.getItem("myToken");
+    if (token) {
+      setIsLoggedIn(true);
+    }
+  }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem("foodini_saved_recipes", JSON.stringify(savedRecipes));
     } catch (e) {
-      if (e instanceof Error && e.name === 'QuotaExceededError') {
+      if (e instanceof Error && e.name === "QuotaExceededError") {
         setError("Storage full! Please delete some saved recipes to save new ones.");
       }
       console.error("Failed to save recipes to localStorage", e);
@@ -86,24 +103,24 @@ export default function App() {
   };
 
   const toggleSaveRecipe = async (recipe: Recipe) => {
-  const isSaved = savedRecipes.some((r) => r.title === recipe.title);
+    const isSaved = savedRecipes.some((r) => r.title === recipe.title);
 
-  if (isSaved) {
-    setSavedRecipes((prev) => prev.filter((r) => r.title !== recipe.title));
-  } else {
-    const recipeToSave = { ...recipe };
+    if (isSaved) {
+      setSavedRecipes((prev) => prev.filter((r) => r.title !== recipe.title));
+    } else {
+      const recipeToSave = { ...recipe };
 
-    if (recipeToSave.imageUrl && recipeToSave.imageUrl.startsWith("data:image")) {
-      try {
-        recipeToSave.imageUrl = await compressImage(recipeToSave.imageUrl, 800, 0.7);
-      } catch (e) {
-        console.error("Failed to compress image", e);
+      if (recipeToSave.imageUrl && recipeToSave.imageUrl.startsWith("data:image")) {
+        try {
+          recipeToSave.imageUrl = await compressImage(recipeToSave.imageUrl, 800, 0.7);
+        } catch (e) {
+          console.error("Failed to compress image", e);
+        }
       }
-    }
 
-    setSavedRecipes((prev) => [...prev, recipeToSave]);
-  }
-};
+      setSavedRecipes((prev) => [...prev, recipeToSave]);
+    }
+  };
 
   const processIngredientsImage = async (base64String: string, mimeType: string) => {
     setImageLoading(true);
@@ -113,7 +130,8 @@ export default function App() {
       const extracted = await extractIngredientsFromImage(base64String, mimeType);
 
       const newIngredients = extracted.filter(
-        (ing) => !ingredients.some((existing) => existing.toLowerCase() === ing.toLowerCase())
+        (ing) =>
+          !ingredients.some((existing) => existing.toLowerCase() === ing.toLowerCase())
       );
 
       if (newIngredients.length > 0) {
@@ -138,6 +156,7 @@ export default function App() {
 
     try {
       const reader = new FileReader();
+
       reader.onloadend = async () => {
         try {
           const result = reader.result;
@@ -157,6 +176,7 @@ export default function App() {
           setImageLoading(false);
         }
       };
+
       reader.readAsDataURL(file);
     } catch (err) {
       setError("Failed to process image. Please try again.");
@@ -217,6 +237,52 @@ export default function App() {
     stopCamera();
   };
 
+  const handleAuth = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (isSignup) {
+        const res = await fetch("http://127.0.0.1:8000/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+
+        if (res.ok) {
+          setIsSignup(false);
+          setError("Account created. Please log in.");
+          setPassword("");
+        } else {
+          setError("User already exists.");
+        }
+      } else {
+        const body = new FormData();
+        body.append("username", username);
+        body.append("password", password);
+
+        const res = await fetch("http://127.0.0.1:8000/token", {
+          method: "POST",
+          body,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem("myToken", data.access_token);
+          setIsLoggedIn(true);
+        } else {
+          setError("Login failed.");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Backend offline.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (ingredients.length === 0) {
       setError("Please add at least one ingredient!");
@@ -226,20 +292,215 @@ export default function App() {
     setError(null);
     setLoading(true);
 
+    const token = localStorage.getItem("myToken");
+
     try {
-      const result = await generateRecipes({
-        ingredients,
-        dietaryRestrictions: restrictions,
-        cuisinePreference: cuisine,
+      await fetch("http://127.0.0.1:8000/set-preferences", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ingredients,
+          dietary_prefs: restrictions,
+          cuisine_prefs: cuisine ? [cuisine] : [],
+        }),
       });
-      setRecipes(result);
+
+      const res = await fetch("http://127.0.0.1:8000/generate-meals", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to get recipes");
+      }
+
+      const data: Recipe[] = await res.json();
+      setRecipes(data);
     } catch (err) {
-      setError("Failed to generate recipes. Please try again.");
       console.error(err);
+      setError("Failed to get recipes.");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem("myToken");
+    setIsLoggedIn(false);
+    setUsername("");
+    setPassword("");
+    setRecipes([]);
+    setError(null);
+    setShowCamera(false);
+    stopCamera();
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-orange-50/50 flex items-center justify-center p-6 transition-colors duration-500">
+        <AnimatePresence mode="wait">
+          {isSignup ? (
+            <motion.div
+              key="signup"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -20, opacity: 0 }}
+              className="max-w-md w-full bg-white border-2 border-orange-100 p-10 rounded-[2.5rem] shadow-2xl shadow-orange-200/40 relative overflow-hidden"
+            >
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-200 rounded-full blur-3xl opacity-30" />
+
+              <div className="flex flex-col items-center text-center mb-8 relative">
+                <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center text-white shadow-lg mb-4">
+                  <Sparkles size={32} />
+                </div>
+                <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+                  Start your Journey
+                </h1>
+                <p className="text-orange-600 font-medium text-sm mt-2 max-w-[250px] mx-auto text-center">
+                  Create an account to unlock personalized magic recipes
+                </p>
+              </div>
+
+              <form onSubmit={handleAuth} className="space-y-4">
+                <div className="group relative">
+                  <UserIcon
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300 group-focus-within:text-orange-500 transition-colors"
+                    size={20}
+                  />
+                  <input
+                    className="w-full bg-orange-50/30 border border-orange-100 p-4 pl-12 rounded-2xl focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all placeholder:text-orange-200"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="group relative">
+                  <Lock
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-300 group-focus-within:text-orange-500 transition-colors"
+                    size={20}
+                  />
+                  <input
+                    className="w-full bg-orange-50/30 border border-orange-100 p-4 pl-12 rounded-2xl focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all placeholder:text-orange-200"
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-xl border border-red-100 mt-2">
+                    <AlertCircle size={14} />
+                    {error}
+                  </div>
+                )}
+
+                <button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-2xl font-bold text-lg shadow-xl shadow-orange-200 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all">
+                  {loading ? <Loader2 className="animate-spin" /> : "Join the Kitchen"}
+                  <ChevronRight size={20} />
+                </button>
+              </form>
+
+              <div className="mt-8 pt-6 border-t border-orange-50 text-center">
+                <p className="text-sm text-gray-500">
+                  Already a chef?{" "}
+                  <button
+                    onClick={() => {
+                      setIsSignup(false);
+                      setError(null);
+                    }}
+                    className="text-orange-600 font-bold hover:underline underline-offset-4"
+                    type="button"
+                  >
+                    Log in
+                  </button>
+                </p>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="login"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 20, opacity: 0 }}
+              className="max-w-md w-full bg-white border-2 border-orange-100 p-10 rounded-[2.5rem] shadow-2xl shadow-orange-200/40"
+            >
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-white shadow-lg mb-4">
+                  <ChefHat size={32} />
+                </div>
+                <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+                  Welcome Back
+                </h1>
+                <p className="text-gray-400 text-sm mt-2 font-medium max-w-[200px] mx-auto">
+                  Ready to see what is cooking today?
+                </p>
+              </div>
+
+              <form onSubmit={handleAuth} className="space-y-4 text-left">
+                <div className="space-y-1.5 group">
+                  <label className="text-[10px] font-bold text-orange-400 ml-1 uppercase tracking-widest">
+                    Username
+                  </label>
+                  <input
+                    className="w-full bg-white border border-orange-100 p-4 rounded-2xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all placeholder:text-gray-300"
+                    placeholder="Your chef name"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5 group">
+                  <label className="text-[10px] font-bold text-orange-400 ml-1 uppercase tracking-widest">
+                    Password
+                  </label>
+                  <input
+                    className="w-full bg-white border border-orange-100 p-4 rounded-2xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all placeholder:text-gray-300"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 p-3 rounded-xl border border-red-100 mt-2">
+                    <AlertCircle size={14} />
+                    {error}
+                  </div>
+                )}
+
+                <button className="w-full bg-orange-500 text-white p-4 rounded-2xl font-bold text-lg shadow-xl shadow-orange-100 flex items-center justify-center gap-2 hover:bg-orange-600 hover:scale-[1.01] transition-all mt-4">
+                  {loading ? <Loader2 className="animate-spin" /> : "Sign In"}
+                  <ArrowRight size={20} />
+                </button>
+              </form>
+
+              <button
+                onClick={() => {
+                  setIsSignup(true);
+                  setError(null);
+                }}
+                className="mt-8 text-sm font-semibold text-gray-400 hover:text-orange-500 transition-colors block w-full text-center"
+                type="button"
+              >
+                New here? <span className="underline decoration-orange-200">Start for free</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] text-[#1A1A1A] font-sans selection:bg-orange-100">
@@ -251,25 +512,42 @@ export default function App() {
             </div>
             <h1 className="text-xl font-semibold tracking-tight">Foodini</h1>
           </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-500">
+
+          <div className="flex items-center gap-6">
+            <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-500">
+              <button
+                onClick={() => setActiveTab("generator")}
+                className={`${
+                  activeTab === "generator" ? "text-orange-600" : "hover:text-gray-900"
+                } transition-colors`}
+                type="button"
+              >
+                Generator
+              </button>
+              <button
+                onClick={() => setActiveTab("saved")}
+                className={`${
+                  activeTab === "saved" ? "text-orange-600" : "hover:text-gray-900"
+                } transition-colors flex items-center gap-2`}
+                type="button"
+              >
+                Saved Recipes
+                {savedRecipes.length > 0 && (
+                  <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                    {savedRecipes.length}
+                  </span>
+                )}
+              </button>
+            </nav>
+
             <button
-              onClick={() => setActiveTab("generator")}
-              className={`${activeTab === "generator" ? "text-orange-600" : "hover:text-gray-900"} transition-colors`}
+              onClick={handleLogout}
+              className="text-gray-400 hover:text-red-500 text-sm font-medium"
+              type="button"
             >
-              Generator
+              Log Out
             </button>
-            <button
-              onClick={() => setActiveTab("saved")}
-              className={`${activeTab === "saved" ? "text-orange-600" : "hover:text-gray-900"} transition-colors flex items-center gap-2`}
-            >
-              Saved Recipes
-              {savedRecipes.length > 0 && (
-                <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
-                  {savedRecipes.length}
-                </span>
-              )}
-            </button>
-          </nav>
+          </div>
         </div>
       </header>
 
@@ -277,13 +555,17 @@ export default function App() {
         <div className="grid md:grid-cols-[350px_1fr] gap-0 md:h-[calc(100vh-80px)]">
           <section className="space-y-10 md:overflow-y-auto py-8 pr-8 md:border-r md:border-gray-100 custom-scrollbar">
             <div>
-              <h2 className="text-3xl font-light tracking-tight mb-2 italic serif">What&apos;s in your kitchen?</h2>
+              <h2 className="text-3xl font-light tracking-tight mb-2 italic serif">
+                What&apos;s in your kitchen?
+              </h2>
               <p className="text-gray-500 text-sm">Add the ingredients you have on hand.</p>
             </div>
 
             <div className="space-y-6">
               <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Ingredients</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  Ingredients
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -303,20 +585,29 @@ export default function App() {
                   <button
                     onClick={startCamera}
                     disabled={imageLoading}
-                    className={`bg-white border border-gray-200 p-3 rounded-xl hover:border-orange-500 hover:text-orange-500 transition-all flex items-center justify-center ${imageLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`bg-white border border-gray-200 p-3 rounded-xl hover:border-orange-500 hover:text-orange-500 transition-all flex items-center justify-center ${
+                      imageLoading ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                     title="Take a photo"
                     type="button"
                   >
-                    {imageLoading ? <Loader2 className="animate-spin" size={20} /> : <Camera size={20} />}
+                    {imageLoading ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <Camera size={20} />
+                    )}
                   </button>
                   <label
                     htmlFor="image-upload"
-                    className={`bg-white border border-gray-200 p-3 rounded-xl hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer flex items-center justify-center ${imageLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`bg-white border border-gray-200 p-3 rounded-xl hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer flex items-center justify-center ${
+                      imageLoading ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                     title="Upload from device"
                   >
                     <Plus size={20} />
                   </label>
                 </div>
+
                 <div className="flex flex-wrap gap-2 pt-2">
                   <AnimatePresence>
                     {ingredients.map((ing) => (
@@ -328,7 +619,11 @@ export default function App() {
                         className="inline-flex items-center gap-1.5 bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs font-medium border border-orange-100"
                       >
                         {ing}
-                        <button onClick={() => removeIngredient(ing)} className="hover:text-orange-900" type="button">
+                        <button
+                          onClick={() => removeIngredient(ing)}
+                          className="hover:text-orange-900"
+                          type="button"
+                        >
                           <X size={14} />
                         </button>
                       </motion.span>
@@ -338,7 +633,9 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Dietary Preferences</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  Dietary Preferences
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {DIETARY_OPTIONS.map((opt) => (
                     <button
@@ -358,7 +655,9 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Cuisine Style (Optional)</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  Cuisine Style (Optional)
+                </label>
                 <select
                   value={cuisine}
                   onChange={(e) => setCuisine(e.target.value)}
@@ -419,6 +718,7 @@ export default function App() {
                       <h3 className="text-xl font-semibold">Recommended for You</h3>
                       <span className="text-sm text-gray-400">{recipes.length} recipes found</span>
                     </div>
+
                     <div className="space-y-12">
                       {recipes.map((recipe, idx) => (
                         <motion.div
@@ -431,11 +731,15 @@ export default function App() {
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex flex-wrap gap-2">
                               {recipe.dietaryTags.map((tag) => (
-                                <span key={tag} className="text-[10px] uppercase tracking-wider font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded">
+                                <span
+                                  key={tag}
+                                  className="text-[10px] uppercase tracking-wider font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded"
+                                >
                                   {tag}
                                 </span>
                               ))}
                             </div>
+
                             <button
                               onClick={() => toggleSaveRecipe(recipe)}
                               className={`p-2 rounded-full transition-all ${
@@ -445,10 +749,17 @@ export default function App() {
                               }`}
                               type="button"
                             >
-                              {savedRecipes.some((r) => r.title === recipe.title) ? <BookmarkCheck size={20} /> : <Bookmark size={20} />}
+                              {savedRecipes.some((r) => r.title === recipe.title) ? (
+                                <BookmarkCheck size={20} />
+                              ) : (
+                                <Bookmark size={20} />
+                              )}
                             </button>
                           </div>
-                          <h4 className="text-2xl font-medium mb-3 group-hover:text-orange-500 transition-colors">{recipe.title}</h4>
+
+                          <h4 className="text-2xl font-medium mb-3 group-hover:text-orange-500 transition-colors">
+                            {recipe.title}
+                          </h4>
 
                           {recipe.imageUrl && (
                             <div className="mb-6 overflow-hidden rounded-2xl aspect-video bg-gray-100 border border-gray-100">
@@ -461,25 +772,33 @@ export default function App() {
                             </div>
                           )}
 
-                          <p className="text-gray-600 text-sm leading-relaxed mb-6">{recipe.description}</p>
+                          <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                            {recipe.description}
+                          </p>
 
                           <div className="grid grid-cols-3 gap-4 mb-8">
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Prep</span>
+                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                Prep
+                              </span>
                               <div className="flex items-center gap-1.5 text-sm font-medium">
                                 <Clock size={14} className="text-gray-400" />
                                 {recipe.prepTime}
                               </div>
                             </div>
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Cook</span>
+                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                Cook
+                              </span>
                               <div className="flex items-center gap-1.5 text-sm font-medium">
                                 <Utensils size={14} className="text-gray-400" />
                                 {recipe.cookTime}
                               </div>
                             </div>
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Serves</span>
+                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                Serves
+                              </span>
                               <div className="flex items-center gap-1.5 text-sm font-medium">
                                 <Users size={14} className="text-gray-400" />
                                 {recipe.servings}
@@ -502,6 +821,7 @@ export default function App() {
                                 ))}
                               </ul>
                             </div>
+
                             <div>
                               <h5 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
                                 <ChevronRight size={16} className="text-orange-500" />
@@ -510,7 +830,9 @@ export default function App() {
                               <ol className="space-y-4">
                                 {recipe.instructions.map((step, i) => (
                                   <li key={i} className="text-sm text-gray-600 flex gap-3">
-                                    <span className="font-bold text-gray-300 tabular-nums">{i + 1}</span>
+                                    <span className="font-bold text-gray-300 tabular-nums">
+                                      {i + 1}
+                                    </span>
                                     {step}
                                   </li>
                                 ))}
@@ -550,6 +872,7 @@ export default function App() {
                     <h3 className="text-xl font-semibold">Your Saved Recipes</h3>
                     <span className="text-sm text-gray-400">{savedRecipes.length} saved</span>
                   </div>
+
                   {savedRecipes.length > 0 ? (
                     <div className="space-y-12">
                       {savedRecipes.map((recipe, idx) => (
@@ -563,11 +886,15 @@ export default function App() {
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex flex-wrap gap-2">
                               {recipe.dietaryTags.map((tag) => (
-                                <span key={tag} className="text-[10px] uppercase tracking-wider font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded">
+                                <span
+                                  key={tag}
+                                  className="text-[10px] uppercase tracking-wider font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded"
+                                >
                                   {tag}
                                 </span>
                               ))}
                             </div>
+
                             <button
                               onClick={() => toggleSaveRecipe(recipe)}
                               className="p-2 rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-all"
@@ -577,7 +904,10 @@ export default function App() {
                               <Trash2 size={20} />
                             </button>
                           </div>
-                          <h4 className="text-2xl font-medium mb-3 group-hover:text-orange-500 transition-colors">{recipe.title}</h4>
+
+                          <h4 className="text-2xl font-medium mb-3 group-hover:text-orange-500 transition-colors">
+                            {recipe.title}
+                          </h4>
 
                           {recipe.imageUrl && (
                             <div className="mb-6 overflow-hidden rounded-2xl aspect-video bg-gray-100 border border-gray-100">
@@ -590,25 +920,33 @@ export default function App() {
                             </div>
                           )}
 
-                          <p className="text-gray-600 text-sm leading-relaxed mb-6">{recipe.description}</p>
+                          <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                            {recipe.description}
+                          </p>
 
                           <div className="grid grid-cols-3 gap-4 mb-8">
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Prep</span>
+                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                Prep
+                              </span>
                               <div className="flex items-center gap-1.5 text-sm font-medium">
                                 <Clock size={14} className="text-gray-400" />
                                 {recipe.prepTime}
                               </div>
                             </div>
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Cook</span>
+                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                Cook
+                              </span>
                               <div className="flex items-center gap-1.5 text-sm font-medium">
                                 <Utensils size={14} className="text-gray-400" />
                                 {recipe.cookTime}
                               </div>
                             </div>
                             <div className="flex flex-col gap-1">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Serves</span>
+                              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                Serves
+                              </span>
                               <div className="flex items-center gap-1.5 text-sm font-medium">
                                 <Users size={14} className="text-gray-400" />
                                 {recipe.servings}
@@ -631,6 +969,7 @@ export default function App() {
                                 ))}
                               </ul>
                             </div>
+
                             <div>
                               <h5 className="text-sm font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
                                 <ChevronRight size={16} className="text-orange-500" />
@@ -639,7 +978,9 @@ export default function App() {
                               <ol className="space-y-4">
                                 {recipe.instructions.map((step, i) => (
                                   <li key={i} className="text-sm text-gray-600 flex gap-3">
-                                    <span className="font-bold text-gray-300 tabular-nums">{i + 1}</span>
+                                    <span className="font-bold text-gray-300 tabular-nums">
+                                      {i + 1}
+                                    </span>
                                     {step}
                                   </li>
                                 ))}
@@ -708,7 +1049,9 @@ export default function App() {
               </div>
             </div>
             <canvas ref={canvasRef} className="hidden" />
-            <p className="text-white/60 text-sm mt-6">Position ingredients in the frame and tap the button</p>
+            <p className="text-white/60 text-sm mt-6">
+              Position ingredients in the frame and tap the button
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
