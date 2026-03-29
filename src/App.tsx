@@ -31,21 +31,19 @@ export default function App() {
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [cuisine, setCuisine] = useState("");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load saved recipes from localStorage on mount
-  useEffect(() => {
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>(() => {
     const stored = localStorage.getItem("foodini_saved_recipes");
     if (stored) {
       try {
-        setSavedRecipes(JSON.parse(stored));
+        return JSON.parse(stored);
       } catch (e) {
         console.error("Failed to parse saved recipes", e);
       }
     }
-  }, []);
+    return [];
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Persist saved recipes to localStorage
   useEffect(() => {
