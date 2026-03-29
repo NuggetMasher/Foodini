@@ -440,14 +440,16 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to get recipes");
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server error: ${res.status}`);
       }
 
       const data: Recipe[] = await res.json();
       setRecipes(data);
     } catch (err) {
       console.error(err);
-      setError("Failed to get recipes.");
+      const message = err instanceof Error ? err.message : "Failed to get recipes.";
+      setError(message);
     } finally {
       setLoading(false);
     }

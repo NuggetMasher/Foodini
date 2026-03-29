@@ -90,7 +90,12 @@ def get_prefs(db: Session = Depends(database.get_db), user: str = Depends(get_cu
 
 @app.get("/generate-meals")
 def generate(db: Session = Depends(database.get_db), user: str = Depends(get_current_user)):
-    return services.get_suggested_meals(db, user)
+    try:
+        recipes = services.get_suggested_meals(db, user)
+        return recipes
+    except Exception as e:
+        print(f"Fatal error in /generate-meals: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recipes: {str(e)}")
 
 @app.post("/save-recipe")
 def save_recipe(
