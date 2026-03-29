@@ -39,6 +39,7 @@ export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]>
     model: "gemini-3-flash-preview",
     contents: prompt,
     config: {
+      systemInstruction: "You are a professional chef. Strictly prioritize dietary restrictions. If a user provides ingredients that conflict with their selected dietary preferences (e.g., meat in a vegetarian request), ignore the conflicting ingredients and do not include them in the recipes. Focus on creating delicious meals using the remaining valid ingredients and common pantry staples.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.ARRAY,
@@ -72,13 +73,12 @@ export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]>
   try {
     const recipes: Recipe[] = JSON.parse(response.text);
     
-    // Generate images for each recipe in parallel
-    const recipesWithImages = await Promise.all(
-      recipes.map(async (recipe) => {
-        const imageUrl = await generateRecipeImage(recipe.title, recipe.description);
-        return { ...recipe, imageUrl };
-      })
-    );
+    // Generate images for each recipe sequentially to avoid rate limits
+    const recipesWithImages: Recipe[] = [];
+    for (const recipe of recipes) {
+      const imageUrl = await generateRecipeImage(recipe.title, recipe.description);
+      recipesWithImages.push({ ...recipe, imageUrl });
+    }
 
     return recipesWithImages;
   } catch (e) {
