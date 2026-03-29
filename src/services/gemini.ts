@@ -86,3 +86,34 @@ export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]>
     return [];
   }
 }
+
+export async function extractIngredientsFromImage(base64Image: string, mimeType: string): Promise<string[]> {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [
+      {
+        inlineData: {
+          data: base64Image,
+          mimeType: mimeType,
+        },
+      },
+      {
+        text: "Identify all the food ingredients visible in this image. Return them as a simple list of ingredient names.",
+      },
+    ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+      },
+    },
+  });
+
+  try {
+    return JSON.parse(response.text);
+  } catch (e) {
+    console.error("Failed to parse ingredients from image:", e);
+    return [];
+  }
+}
