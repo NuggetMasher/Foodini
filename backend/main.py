@@ -76,6 +76,18 @@ def set_prefs(prefs: schemas.UserPrefUpdate, db: Session = Depends(database.get_
     db.commit()
     return {"status": "saved"}
 
+@app.get("/get-preferences")
+def get_prefs(db: Session = Depends(database.get_db), user: str = Depends(get_current_user)):
+    db_pref = db.query(models.UserPreference).filter(models.UserPreference.username == user).first()
+    if not db_pref:
+        return {"ingredients": [], "dietary_prefs": [], "cuisine_prefs": []}
+    
+    return {
+        "ingredients": json.loads(db_pref.ingredients) if db_pref.ingredients else [],
+        "dietary_prefs": json.loads(db_pref.dietary_prefs) if db_pref.dietary_prefs else [],
+        "cuisine_prefs": json.loads(db_pref.cuisine_prefs) if db_pref.cuisine_prefs else []
+    }
+
 @app.get("/generate-meals")
 def generate(db: Session = Depends(database.get_db), user: str = Depends(get_current_user)):
     return services.get_suggested_meals(db, user)

@@ -73,6 +73,35 @@ export default function App() {
     }
   }, []);
 
+  // Load user preferences (ingredients, restrictions, cuisine) when logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      const loadPreferences = async () => {
+        try {
+          const token = localStorage.getItem("myToken");
+          if (!token) return;
+
+          const res = await fetch("http://127.0.0.1:8000/get-preferences", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            const prefs = await res.json();
+            setIngredients(prefs.ingredients || []);
+            setRestrictions(prefs.dietary_prefs || []);
+            setCuisine(prefs.cuisine_prefs?.[0] || "");
+          }
+        } catch (err) {
+          console.error("Failed to load preferences:", err);
+        }
+      };
+
+      loadPreferences();
+    }
+  }, [isLoggedIn]);
+
   useEffect(() => {
     try {
       localStorage.setItem("foodini_saved_recipes", JSON.stringify(savedRecipes));
@@ -83,6 +112,37 @@ export default function App() {
       console.error("Failed to save recipes to localStorage", e);
     }
   }, [savedRecipes]);
+
+  // Auto-save preferences when ingredients, restrictions, or cuisine changes
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const savePreferences = async () => {
+      try {
+        const token = localStorage.getItem("myToken");
+        if (!token) return;
+
+        await fetch("http://127.0.0.1:8000/set-preferences", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ingredients,
+            dietary_prefs: restrictions,
+            cuisine_prefs: cuisine ? [cuisine] : [],
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to auto-save preferences:", err);
+      }
+    };
+
+    // Debounce the save by using a timeout
+    const timeoutId = setTimeout(savePreferences, 500);
+    return () => clearTimeout(timeoutId);
+  }, [ingredients, restrictions, cuisine, isLoggedIn]);
 
   const addIngredient = () => {
     const trimmed = currentIngredient.trim();
@@ -336,6 +396,10 @@ export default function App() {
     setRecipes([]);
     setError(null);
     setShowCamera(false);
+    setIngredients([]);
+    setCurrentIngredient("");
+    setRestrictions([]);
+    setCuisine("");
     stopCamera();
   };
 
