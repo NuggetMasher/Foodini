@@ -17,8 +17,9 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { Recipe } from "./types";
+import { Recipe, UserPreferences } from "./types";
 import { generateRecipes, extractIngredientsFromImage } from "./services/gemini";
+import { compressImage } from "./utils/image";
 
 const DIETARY_OPTIONS = [
   "Vegetarian",
@@ -56,7 +57,14 @@ export default function App() {
 });
 
   useEffect(() => {
-    localStorage.setItem("foodini_saved_recipes", JSON.stringify(savedRecipes));
+    try {
+      localStorage.setItem("foodini_saved_recipes", JSON.stringify(savedRecipes));
+    } catch (e) {
+      if (e instanceof Error && e.name === 'QuotaExceededError') {
+        setError("Storage full! Please delete some saved recipes to save new ones.");
+      }
+      console.error("Failed to save recipes to localStorage", e);
+    }
   }, [savedRecipes]);
 
   const addIngredient = () => {
@@ -77,14 +85,25 @@ export default function App() {
     );
   };
 
-  const toggleSaveRecipe = (recipe: Recipe) => {
-    const isSaved = savedRecipes.some((r) => r.title === recipe.title);
-    if (isSaved) {
-      setSavedRecipes((prev) => prev.filter((r) => r.title !== recipe.title));
-    } else {
-      setSavedRecipes((prev) => [...prev, recipe]);
+  const toggleSaveRecipe = async (recipe: Recipe) => {
+  const isSaved = savedRecipes.some((r) => r.title === recipe.title);
+
+  if (isSaved) {
+    setSavedRecipes((prev) => prev.filter((r) => r.title !== recipe.title));
+  } else {
+    const recipeToSave = { ...recipe };
+
+    if (recipeToSave.imageUrl && recipeToSave.imageUrl.startsWith("data:image")) {
+      try {
+        recipeToSave.imageUrl = await compressImage(recipeToSave.imageUrl, 800, 0.7);
+      } catch (e) {
+        console.error("Failed to compress image", e);
+      }
     }
-  };
+
+    setSavedRecipes((prev) => [...prev, recipeToSave]);
+  }
+};
 
   const processIngredientsImage = async (base64String: string, mimeType: string) => {
     setImageLoading(true);
