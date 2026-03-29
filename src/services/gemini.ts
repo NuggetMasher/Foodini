@@ -4,13 +4,12 @@ import { Recipe, UserPreferences } from "../types";
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function generateRecipes(prefs: UserPreferences): Promise<Recipe[]> {
-  const prompt = `Generate up to 10 unique creative and delicious meal ideas based on these inputs:
+  const prompt = `Generate 3 creative and delicious meal ideas based on these inputs:
     Available Ingredients: ${prefs.ingredients.join(", ")}
     Dietary Restrictions: ${prefs.dietaryRestrictions.join(", ")}
     Cuisine Preference: ${prefs.cuisinePreference || "Any"}
 
-    Provide detailed recipes including prep time, cook time, and clear instructions.
-    Be sure to `;
+    Provide detailed recipes including prep time, cook time, and clear instructions.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
