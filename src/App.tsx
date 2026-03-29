@@ -211,7 +211,11 @@ export default function App() {
                   <option value="">Any Cuisine</option>
                   <option value="Italian">Italian</option>
                   <option value="Mexican">Mexican</option>
-                  <option value="Asian">Asian</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Thai">Thai</option>
+                  <option value="Indian">Indian</option>
+                  <option value="American">American</option>
                   <option value="Mediterranean">Mediterranean</option>
                   <option value="French">French</option>
                 </select>
