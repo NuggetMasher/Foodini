@@ -7,6 +7,20 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
 
+class SavedRecipe(Base):
+    __tablename__ = "saved_recipes"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title = Column(String)
+    description = Column(Text)
+    ingredients = Column(Text)  # JSON array stored as string
+    instructions = Column(Text)  # JSON array stored as string
+    prep_time = Column(String)
+    cook_time = Column(String)
+    servings = Column(Integer)
+    dietary_tags = Column(Text)  # JSON array stored as string
+    image_url = Column(Text, nullable=True)
+
 class Recipe(Base):
     __tablename__ = "recipes"
     id = Column(Integer, primary_key=True, index=True)

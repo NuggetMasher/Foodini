@@ -91,3 +91,80 @@ def get_prefs(db: Session = Depends(database.get_db), user: str = Depends(get_cu
 @app.get("/generate-meals")
 def generate(db: Session = Depends(database.get_db), user: str = Depends(get_current_user)):
     return services.get_suggested_meals(db, user)
+
+@app.post("/save-recipe")
+def save_recipe(
+    recipe: schemas.RecipeCreate,
+    db: Session = Depends(database.get_db),
+    username: str = Depends(get_current_user)
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db_recipe = models.SavedRecipe(
+        user_id=user.id,
+        title=recipe.title,
+        description=recipe.description,
+        ingredients=json.dumps(recipe.ingredients),
+        instructions=json.dumps(recipe.instructions),
+        prep_time=recipe.prep_time,
+        cook_time=recipe.cook_time,
+        servings=recipe.servings,
+        dietary_tags=json.dumps(recipe.dietary_tags),
+        image_url=recipe.image_url
+    )
+    db.add(db_recipe)
+    db.commit()
+    db.refresh(db_recipe)
+    return {"id": db_recipe.id, "message": "Recipe saved successfully"}
+
+@app.get("/saved-recipes")
+def get_saved_recipes(
+    db: Session = Depends(database.get_db),
+    username: str = Depends(get_current_user)
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    recipes = db.query(models.SavedRecipe).filter(models.SavedRecipe.user_id == user.id).all()
+    
+    result = []
+    for recipe in recipes:
+        result.append({
+            "id": recipe.id,
+            "title": recipe.title,
+            "description": recipe.description,
+            "ingredients": json.loads(recipe.ingredients) if recipe.ingredients else [],
+            "instructions": json.loads(recipe.instructions) if recipe.instructions else [],
+            "prepTime": recipe.prep_time,
+            "cookTime": recipe.cook_time,
+            "servings": recipe.servings,
+            "dietaryTags": json.loads(recipe.dietary_tags) if recipe.dietary_tags else [],
+            "imageUrl": recipe.image_url
+        })
+    
+    return result
+
+@app.delete("/saved-recipes/{recipe_id}")
+def delete_saved_recipe(
+    recipe_id: int,
+    db: Session = Depends(database.get_db),
+    username: str = Depends(get_current_user)
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    recipe = db.query(models.SavedRecipe).filter(
+        models.SavedRecipe.id == recipe_id,
+        models.SavedRecipe.user_id == user.id
+    ).first()
+    
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found or unauthorized")
+    
+    db.delete(recipe)
+    db.commit()
+    return {"message": "Recipe deleted successfully"}

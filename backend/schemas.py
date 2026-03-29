@@ -13,3 +13,29 @@ class UserPrefUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class RecipeCreate(BaseModel):
+    title: str
+    description: str
+    ingredients: List[str]
+    instructions: List[str]
+    prep_time: str
+    cook_time: str
+    servings: int
+    dietary_tags: List[str]
+    image_url: Optional[str] = None
+
+class RecipeResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    ingredients: List[str]
+    instructions: List[str]
+    prep_time: str
+    cook_time: str
+    servings: int
+    dietary_tags: List[str]
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True

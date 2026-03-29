@@ -56,15 +56,7 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>(() => {
-    try {
-      const stored = localStorage.getItem("foodini_saved_recipes");
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      console.error("Failed to parse saved recipes", e);
-      return [];
-    }
-  });
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("myToken");
@@ -102,16 +94,32 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
+  // Load saved recipes from the database when logged in
   useEffect(() => {
-    try {
-      localStorage.setItem("foodini_saved_recipes", JSON.stringify(savedRecipes));
-    } catch (e) {
-      if (e instanceof Error && e.name === "QuotaExceededError") {
-        setError("Storage full! Please delete some saved recipes to save new ones.");
-      }
-      console.error("Failed to save recipes to localStorage", e);
+    if (isLoggedIn) {
+      const loadSavedRecipes = async () => {
+        try {
+          const token = localStorage.getItem("myToken");
+          if (!token) return;
+
+          const res = await fetch("http://127.0.0.1:8000/saved-recipes", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            const recipes = await res.json();
+            setSavedRecipes(recipes);
+          }
+        } catch (err) {
+          console.error("Failed to load saved recipes:", err);
+        }
+      };
+
+      loadSavedRecipes();
     }
-  }, [savedRecipes]);
+  }, [isLoggedIn]);
 
   // Auto-save preferences when ingredients, restrictions, or cuisine changes
   useEffect(() => {
@@ -163,22 +171,79 @@ export default function App() {
   };
 
   const toggleSaveRecipe = async (recipe: Recipe) => {
+    const token = localStorage.getItem("myToken");
+    if (!token) {
+      setError("Please log in to save recipes");
+      return;
+    }
+
     const isSaved = savedRecipes.some((r) => r.title === recipe.title);
 
-    if (isSaved) {
-      setSavedRecipes((prev) => prev.filter((r) => r.title !== recipe.title));
-    } else {
-      const recipeToSave = { ...recipe };
+    try {
+      if (isSaved) {
+        // Find the saved recipe to get its ID
+        const savedRecipe = savedRecipes.find((r) => r.title === recipe.title);
+        if (!savedRecipe || !("id" in savedRecipe)) return;
 
-      if (recipeToSave.imageUrl && recipeToSave.imageUrl.startsWith("data:image")) {
-        try {
-          recipeToSave.imageUrl = await compressImage(recipeToSave.imageUrl, 800, 0.7);
-        } catch (e) {
-          console.error("Failed to compress image", e);
+        const id = (savedRecipe as any).id;
+        const res = await fetch(`http://127.0.0.1:8000/saved-recipes/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          setSavedRecipes((prev) => prev.filter((r) => r.title !== recipe.title));
+        } else {
+          setError("Failed to delete saved recipe");
+        }
+      } else {
+        const recipeToSave = { ...recipe };
+
+        if (recipeToSave.imageUrl && recipeToSave.imageUrl.startsWith("data:image")) {
+          try {
+            recipeToSave.imageUrl = await compressImage(recipeToSave.imageUrl, 800, 0.7);
+          } catch (e) {
+            console.error("Failed to compress image", e);
+          }
+        }
+
+        const res = await fetch("http://127.0.0.1:8000/save-recipe", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: recipeToSave.title,
+            description: recipeToSave.description,
+            ingredients: recipeToSave.ingredients,
+            instructions: recipeToSave.instructions,
+            prep_time: recipeToSave.prepTime,
+            cook_time: recipeToSave.cookTime,
+            servings: recipeToSave.servings,
+            dietary_tags: recipeToSave.dietaryTags,
+            image_url: recipeToSave.imageUrl,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setSavedRecipes((prev) => [
+            ...prev,
+            {
+              ...recipeToSave,
+              id: data.id,
+            } as any,
+          ]);
+        } else {
+          setError("Failed to save recipe");
         }
       }
-
-      setSavedRecipes((prev) => [...prev, recipeToSave]);
+    } catch (err) {
+      console.error("Error toggling save recipe:", err);
+      setError("Failed to save recipe. Please try again.");
     }
   };
 
@@ -394,6 +459,7 @@ export default function App() {
     setUsername("");
     setPassword("");
     setRecipes([]);
+    setSavedRecipes([]);
     setError(null);
     setShowCamera(false);
     setIngredients([]);
